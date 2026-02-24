@@ -17,6 +17,7 @@ const Gallery = () => {
   const [selectedItem, setSelectedItem] = useState(null);
   const [editingItem, setEditingItem] = useState(null);
   const [editName, setEditName] = useState('');
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const fileInputRef = useRef(null);
 
   useEffect(() => {
@@ -249,13 +250,18 @@ const Gallery = () => {
         </div>
 
         {selectedItem && (
-          <div className="viewer-panel">
+          <div className={`viewer-panel ${isFullscreen ? 'fullscreen' : ''}`}>
             <div className="viewer-header">
               <h3>{selectedItem.name}</h3>
-              <button onClick={() => setSelectedItem(null)}>✕</button>
+              <div className="viewer-actions">
+                <button onClick={() => setIsFullscreen(!isFullscreen)} title={isFullscreen ? 'Sair da tela cheia' : 'Tela cheia'}>
+                  {isFullscreen ? '⛶' : '⛶'}
+                </button>
+                <button onClick={() => setSelectedItem(null)}>✕</button>
+              </div>
             </div>
             <div className="viewer-content">
-              <GLBViewer url={selectedItem.glb_url} />
+              <GLBViewer url={selectedItem.glb_url} isFullscreen={isFullscreen} />
             </div>
             <div className="viewer-info">
               <p>Arquivo: {selectedItem.file_name}</p>
@@ -275,7 +281,7 @@ const Gallery = () => {
   );
 };
 
-const GLBViewer = ({ url }) => {
+const GLBViewer = ({ url, isFullscreen }) => {
   if (!url) {
     return (
       <div className="glb-viewer" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#666' }}>
@@ -285,7 +291,7 @@ const GLBViewer = ({ url }) => {
   }
 
   return (
-    <div className="glb-viewer" style={{ width: '100%', height: '100%', minHeight: '300px', background: '#1a1a2e' }}>
+    <div className="glb-viewer" style={{ width: '100%', height: isFullscreen ? '100vh' : '100%', minHeight: isFullscreen ? '100vh' : '300px', background: '#1a1a2e' }}>
       <model-viewer
         src={url}
         ar
