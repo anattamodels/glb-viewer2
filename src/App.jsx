@@ -3,6 +3,7 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Gallery from './pages/Gallery';
+import Landing from './pages/Landing';
 
 const ProtectedRoute = ({ children }) => {
   const { user, loading } = useAuth();
@@ -49,7 +50,7 @@ const AppRoutes = () => {
           </ProtectedRoute>
         } 
       />
-      <Route path="/" element={<Navigate to="/dashboard" replace />} />
+      <Route path="/" element={<Landing />} />
     </Routes>
   );
 };
