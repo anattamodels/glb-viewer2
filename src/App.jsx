@@ -56,7 +56,7 @@ const AppRoutes = () => {
 
 function App() {
   return (
-    <BrowserRouter>
+    <BrowserRouter basename="/glb-viewer2">
       <AuthProvider>
         <AppRoutes />
       </AuthProvider>
