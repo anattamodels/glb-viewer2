@@ -1,3 +1,7 @@
+# Firebase
+firebase-credentials/
+.env
+
 # Logs
 logs
 *.log

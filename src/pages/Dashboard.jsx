@@ -19,9 +19,11 @@ const Dashboard = () => {
   }, [user]);
 
   const loadGalleries = async () => {
-    if (!user) return;
+    if (!user || !user.id) return;
     try {
-      const data = await galleryService.getGalleries(user.uid);
+      
+      const data = await galleryService.getGalleries(user.id);
+      
       setGalleries(data);
     } catch (error) {
       console.error('Error loading galleries:', error);
@@ -36,7 +38,7 @@ const Dashboard = () => {
     
     setSubmitting(true);
     try {
-      const gallery = await galleryService.createGallery(user.uid, newGallery.name, newGallery.description);
+      const gallery = await galleryService.createGallery(user.id, newGallery.name, newGallery.description);
       setGalleries([gallery, ...galleries]);
       setShowModal(false);
       setNewGallery({ name: '', description: '' });
@@ -71,6 +73,7 @@ const Dashboard = () => {
 
   const formatDate = (date) => {
     if (!date) return '';
+    if (typeof date === 'string') return new Date(date).toLocaleDateString('pt-BR');
     if (date.seconds) return new Date(date.seconds * 1000).toLocaleDateString('pt-BR');
     return new Date(date).toLocaleDateString('pt-BR');
   };
@@ -88,6 +91,9 @@ const Dashboard = () => {
     <div className="dashboard">
       <header className="dashboard-header">
         <div className="header-left">
+          <button className="home-btn" onClick={() => navigate('/')} title="Home">
+            🏠
+          </button>
           <h1>Minhas Galerias</h1>
           {isDemoMode && <span className="demo-badge">DEMO</span>}
           <span className="user-email">{user?.email}</span>
@@ -125,7 +131,7 @@ const Dashboard = () => {
                   <h3>{gallery.name}</h3>
                   {gallery.description && <p>{gallery.description}</p>}
                   <span className="gallery-date">
-                    Atualizado em {formatDate(gallery.updatedAt)}
+                    Atualizado em {formatDate(gallery.updated_at)}
                   </span>
                 </div>
                 <button 

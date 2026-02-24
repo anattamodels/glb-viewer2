@@ -1,24 +1,19 @@
 import { createContext, useContext, useState, useEffect } from 'react';
-import { 
-  createUserWithEmailAndPassword, 
-  signInWithEmailAndPassword, 
-  signOut, 
-  onAuthStateChanged,
-  updateProfile
-} from 'firebase/auth';
-import { auth } from '../firebase/config';
+import { supabase } from '../supabase/config';
 
-const DEMO_MODE = !import.meta.env.VITE_FIREBASE_API_KEY || 
-                  import.meta.env.VITE_FIREBASE_API_KEY === 'your_api_key';
+const isDemoMode = !import.meta.env.VITE_SUPABASE_URL || 
+                   import.meta.env.VITE_SUPABASE_URL === '';
+
+
 
 const AuthContext = createContext();
 
 export const useAuth = () => useContext(AuthContext);
 
 const DEMO_USER = {
-  uid: 'demo-user-123',
+  id: 'demo-user-123',
   email: 'demo@demo.com',
-  displayName: 'Demo User'
+  user_metadata: { display_name: 'Demo User' }
 };
 
 const loadDemoGalleries = () => {
@@ -40,51 +35,88 @@ const saveDemoItems = (items) => {
 };
 
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(DEMO_MODE ? DEMO_USER : null);
+  const [user, setUser] = useState(isDemoMode ? DEMO_USER : null);
   const [loading, setLoading] = useState(false);
-  const [isDemoMode] = useState(DEMO_MODE);
 
   useEffect(() => {
-    if (!DEMO_MODE) {
-      const unsubscribe = onAuthStateChanged(auth, (user) => {
-        setUser(user);
+    
+    
+    if (!isDemoMode) {
+      const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+        
+        setUser(session?.user || null);
         setLoading(false);
       });
-      return unsubscribe;
+
+      return () => subscription.unsubscribe();
     }
   }, []);
 
   const signup = async (email, password, displayName) => {
-    if (DEMO_MODE) {
-      const user = { ...DEMO_USER, email, displayName };
+    
+    
+    if (isDemoMode) {
+      const user = { ...DEMO_USER, email, user_metadata: { display_name: displayName } };
       localStorage.setItem('demo_user', JSON.stringify(user));
       setUser(user);
       return { user };
     }
-    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-    if (displayName) {
-      await updateProfile(userCredential.user, { displayName });
+    
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: { data: { display_name: displayName } }
+      });
+      if (error) throw error;
+      
+      return data;
+    } catch (err) {
+      console.error('Signup error:', err);
+      throw err;
     }
-    return userCredential;
   };
 
   const login = async (email, password) => {
-    if (DEMO_MODE) {
+    
+    
+    if (isDemoMode) {
       const user = { ...DEMO_USER, email };
       localStorage.setItem('demo_user', JSON.stringify(user));
       setUser(user);
       return { user };
     }
-    return signInWithEmailAndPassword(auth, email, password);
+    
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password
+      });
+      if (error) throw error;
+      
+      return data;
+    } catch (err) {
+      console.error('Login error:', err);
+      throw err;
+    }
   };
 
   const logout = async () => {
-    if (DEMO_MODE) {
+    
+    
+    if (isDemoMode) {
       localStorage.removeItem('demo_user');
       setUser(null);
       return;
     }
-    return signOut(auth);
+    
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+      setUser(null);
+    } catch (err) {
+      console.error('Logout error:', err);
+    }
   };
 
   const value = {
@@ -94,10 +126,10 @@ export const AuthProvider = ({ children }) => {
     signup,
     login,
     logout,
-    demoGalleries: DEMO_MODE ? loadDemoGalleries() : null,
-    demoItems: DEMO_MODE ? loadDemoItems() : null,
-    saveDemoGalleries: DEMO_MODE ? saveDemoGalleries : null,
-    saveDemoItems: DEMO_MODE ? saveDemoItems : null
+    demoGalleries: isDemoMode ? loadDemoGalleries() : null,
+    demoItems: isDemoMode ? loadDemoItems() : null,
+    saveDemoGalleries: isDemoMode ? saveDemoGalleries : null,
+    saveDemoItems: isDemoMode ? saveDemoItems : null
   };
 
   return (
@@ -107,4 +139,4 @@ export const AuthProvider = ({ children }) => {
   );
 };
 
-export { DEMO_MODE };
+export { isDemoMode };

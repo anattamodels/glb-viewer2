@@ -1,23 +1,7 @@
-import { useAuth } from '../context/AuthContext';
-import { db, storage } from '../firebase/config';
-import { 
-  collection, 
-  doc, 
-  addDoc, 
-  updateDoc, 
-  deleteDoc, 
-  getDocs, 
-  getDoc,
-  query, 
-  where,
-  orderBy 
-} from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
+import { supabase } from '../supabase/config';
 
-const COLLECTIONS = {
-  GALLERIES: 'galleries',
-  ITEMS: 'items'
-};
+const isDemoMode = !import.meta.env.VITE_SUPABASE_URL || 
+                   import.meta.env.VITE_SUPABASE_URL === '';
 
 let demoGalleries = [];
 let demoItems = [];
@@ -45,11 +29,12 @@ const saveDemoItems = () => {
 
 export const galleryService = {
   isDemoMode() {
-    return !import.meta.env.VITE_FIREBASE_API_KEY || 
-           import.meta.env.VITE_FIREBASE_API_KEY === 'your_api_key';
+    return isDemoMode;
   },
 
   async createGallery(userId, name, description = '') {
+    
+    
     if (this.isDemoMode()) {
       loadDemoData();
       const gallery = {
@@ -57,52 +42,91 @@ export const galleryService = {
         userId,
         name,
         description,
-        createdAt: new Date(),
-        updatedAt: new Date()
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
       };
       demoGalleries.unshift(gallery);
       saveDemoGalleries();
       return gallery;
     }
 
-    const gallery = {
-      userId,
-      name,
-      description,
-      createdAt: new Date(),
-      updatedAt: new Date()
-    };
-    const docRef = await addDoc(collection(db, COLLECTIONS.GALLERIES), gallery);
-    return { id: docRef.id, ...gallery };
+    try {
+      const { data, error } = await supabase
+        .from('galleries')
+        .insert([{
+          user_id: userId,
+          name,
+          description,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        }])
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Supabase error creating gallery:', error);
+        throw error;
+      }
+      
+      return data;
+    } catch (err) {
+      console.error('Error in createGallery:', err);
+      throw err;
+    }
   },
 
   async getGalleries(userId) {
+    
+    
     if (this.isDemoMode()) {
       loadDemoData();
       return demoGalleries.filter(g => g.userId === userId);
     }
 
-    const q = query(
-      collection(db, COLLECTIONS.GALLERIES),
-      where('userId', '==', userId),
-      orderBy('updatedAt', 'desc')
-    );
-    const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    try {
+      const { data, error } = await supabase
+        .from('galleries')
+        .select('*')
+        .eq('user_id', userId)
+        .order('updated_at', { ascending: false });
+
+      if (error) {
+        console.error('Supabase error getting galleries:', error);
+        throw error;
+      }
+      
+      return data || [];
+    } catch (err) {
+      console.error('Error in getGalleries:', err);
+      return [];
+    }
   },
 
   async getGallery(galleryId) {
+    
+    
     if (this.isDemoMode()) {
       loadDemoData();
       return demoGalleries.find(g => g.id === galleryId) || null;
     }
 
-    const docRef = doc(db, COLLECTIONS.GALLERIES, galleryId);
-    const docSnap = await getDoc(docRef);
-    if (docSnap.exists()) {
-      return { id: docSnap.id, ...docSnap.data() };
+    try {
+      const { data, error } = await supabase
+        .from('galleries')
+        .select('*')
+        .eq('id', galleryId)
+        .single();
+
+      if (error) {
+        console.error('Supabase error getting gallery:', error);
+        return null;
+      }
+      
+      return data;
+    } catch (err) {
+      console.error('Error in getGallery:', err);
+      return null;
     }
-    return null;
   },
 
   async updateGallery(galleryId, data) {
@@ -110,14 +134,22 @@ export const galleryService = {
       loadDemoData();
       const index = demoGalleries.findIndex(g => g.id === galleryId);
       if (index !== -1) {
-        demoGalleries[index] = { ...demoGalleries[index], ...data, updatedAt: new Date() };
+        demoGalleries[index] = { ...demoGalleries[index], ...data, updated_at: new Date().toISOString() };
         saveDemoGalleries();
       }
       return;
     }
 
-    const docRef = doc(db, COLLECTIONS.GALLERIES, galleryId);
-    await updateDoc(docRef, { ...data, updatedAt: new Date() });
+    try {
+      const { error } = await supabase
+        .from('galleries')
+        .update({ ...data, updated_at: new Date().toISOString() })
+        .eq('id', galleryId);
+
+      if (error) throw error;
+    } catch (err) {
+      console.error('Error in updateGallery:', err);
+    }
   },
 
   async deleteGallery(galleryId) {
@@ -130,90 +162,152 @@ export const galleryService = {
       return;
     }
 
-    const items = await this.getItems(galleryId);
-    for (const item of items) {
-      if (item.thumbnailUrl) {
-        try {
-          const thumbRef = ref(storage, item.thumbnailUrl);
-          await deleteObject(thumbRef);
-        } catch (e) {}
+    try {
+      const { data: items } = await this.getItems(galleryId);
+      for (const item of items || []) {
+        if (item.glb_url) {
+          try {
+            const path = item.glb_url.split('/storage/v1/object/public/glb-files/')[1];
+            if (path) await supabase.storage.from('glb-files').remove([path]);
+          } catch (e) {}
+        }
+        if (item.thumbnail_url) {
+          try {
+            const path = item.thumbnail_url.split('/storage/v1/object/public/glb-files/')[1];
+            if (path) await supabase.storage.from('glb-files').remove([path]);
+          } catch (e) {}
+        }
+        await this.deleteItem(item.id);
       }
-      if (item.glbUrl) {
-        try {
-          const fileRef = ref(storage, item.glbUrl);
-          await deleteObject(fileRef);
-        } catch (e) {}
-      }
-      await this.deleteItem(item.id);
+
+      const { error } = await supabase
+        .from('galleries')
+        .delete()
+        .eq('id', galleryId);
+
+      if (error) throw error;
+    } catch (err) {
+      console.error('Error in deleteGallery:', err);
     }
-    const docRef = doc(db, COLLECTIONS.GALLERIES, galleryId);
-    await deleteDoc(docRef);
   },
 
-  async createItem(galleryId, file, thumbnailBlob) {
+  async createItem(galleryId, file, thumbnailBlob, userId = 'anonymous') {
+    
+    
     if (this.isDemoMode()) {
       loadDemoData();
       const timestamp = Date.now();
       const item = {
         id: 'demo_item_' + timestamp,
-        galleryId,
+        gallery_id: galleryId,
         name: file.name.replace('.glb', ''),
-        fileName: file.name,
-        glbUrl: URL.createObjectURL(file),
-        thumbnailUrl: null,
-        fileSize: file.size,
-        createdAt: new Date(),
-        updatedAt: new Date()
+        file_name: file.name,
+        glb_url: URL.createObjectURL(file),
+        thumbnail_url: null,
+        file_size: file.size,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
       };
       demoItems.unshift(item);
       saveDemoItems();
       return item;
     }
 
-    const userId = 'anonymous';
-    const timestamp = Date.now();
-    const fileName = `${timestamp}_${file.name}`;
-    
-    const fileRef = ref(storage, `glb/${userId}/${galleryId}/${fileName}`);
-    await uploadBytes(fileRef, file);
-    const glbUrl = await getDownloadURL(fileRef);
+    try {
+      const timestamp = Date.now();
+      const fileName = `${timestamp}_${file.name}`;
+      const filePath = `glb/${userId}/${galleryId}/${fileName}`;
+      
+      
+      
+      const { error: uploadError } = await supabase.storage
+        .from('glb-files')
+        .upload(filePath, file);
 
-    let thumbnailUrl = null;
-    if (thumbnailBlob) {
-      const thumbName = `thumb_${fileName.replace('.glb', '.png')}`;
-      const thumbRef = ref(storage, `thumbnails/${userId}/${galleryId}/${thumbName}`);
-      await uploadBytes(thumbRef, thumbnailBlob);
-      thumbnailUrl = await getDownloadURL(thumbRef);
+      if (uploadError) {
+        console.error('Storage upload error:', uploadError);
+        throw uploadError;
+      }
+
+      const { data: urlData } = supabase.storage
+        .from('glb-files')
+        .getPublicUrl(filePath);
+      const glbUrl = urlData?.publicUrl || `https://ngnjgjyxqiufiqgwdixf.supabase.co/storage/v1/object/public/glb-files/${filePath}`;
+
+      
+
+      let thumbnailUrl = null;
+      if (thumbnailBlob) {
+        const thumbName = `thumb_${fileName.replace('.glb', '.png')}`;
+        const thumbPath = `thumbnails/${userId}/${galleryId}/${thumbName}`;
+        
+        const { error: thumbError } = await supabase.storage
+          .from('glb-files')
+          .upload(thumbPath, thumbnailBlob);
+
+        if (!thumbError) {
+          const { data: thumbUrlData } = supabase.storage.from('glb-files').getPublicUrl(thumbPath);
+          thumbnailUrl = thumbUrlData?.publicUrl || `https://ngnjgjyxqiufiqgwdixf.supabase.co/storage/v1/object/public/glb-files/${thumbPath}`;
+        }
+      }
+
+      const item = {
+        gallery_id: galleryId,
+        name: file.name.replace('.glb', ''),
+        file_name: file.name,
+        glb_url: glbUrl,
+        thumbnail_url: thumbnailUrl,
+        file_size: file.size,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+
+      
+
+      const { data, error } = await supabase
+        .from('items')
+        .insert([item])
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Database insert error:', error);
+        throw error;
+      }
+      
+      
+      return data;
+    } catch (err) {
+      console.error('Error in createItem:', err);
+      throw err;
     }
-
-    const item = {
-      galleryId,
-      name: file.name.replace('.glb', ''),
-      fileName: file.name,
-      glbUrl,
-      thumbnailUrl,
-      fileSize: file.size,
-      createdAt: new Date(),
-      updatedAt: new Date()
-    };
-
-    const docRef = await addDoc(collection(db, COLLECTIONS.ITEMS), item);
-    return { id: docRef.id, ...item };
   },
 
   async getItems(galleryId) {
+    
+    
     if (this.isDemoMode()) {
       loadDemoData();
-      return demoItems.filter(i => i.galleryId === galleryId);
+      return demoItems.filter(i => i.gallery_id === galleryId);
     }
 
-    const q = query(
-      collection(db, COLLECTIONS.ITEMS),
-      where('galleryId', '==', galleryId),
-      orderBy('createdAt', 'desc')
-    );
-    const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    try {
+      const { data, error } = await supabase
+        .from('items')
+        .select('*')
+        .eq('gallery_id', galleryId)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Supabase error getting items:', error);
+        throw error;
+      }
+      
+      return data || [];
+    } catch (err) {
+      console.error('Error in getItems:', err);
+      return [];
+    }
   },
 
   async updateItem(itemId, data) {
@@ -221,14 +315,22 @@ export const galleryService = {
       loadDemoData();
       const index = demoItems.findIndex(i => i.id === itemId);
       if (index !== -1) {
-        demoItems[index] = { ...demoItems[index], ...data, updatedAt: new Date() };
+        demoItems[index] = { ...demoItems[index], ...data, updated_at: new Date().toISOString() };
         saveDemoItems();
       }
       return;
     }
 
-    const docRef = doc(db, COLLECTIONS.ITEMS, itemId);
-    await updateDoc(docRef, { ...data, updatedAt: new Date() });
+    try {
+      const { error } = await supabase
+        .from('items')
+        .update({ ...data, updated_at: new Date().toISOString() })
+        .eq('id', itemId);
+
+      if (error) throw error;
+    } catch (err) {
+      console.error('Error in updateItem:', err);
+    }
   },
 
   async deleteItem(itemId) {
@@ -239,8 +341,16 @@ export const galleryService = {
       return;
     }
 
-    const docRef = doc(db, COLLECTIONS.ITEMS, itemId);
-    await deleteDoc(docRef);
+    try {
+      const { error } = await supabase
+        .from('items')
+        .delete()
+        .eq('id', itemId);
+
+      if (error) throw error;
+    } catch (err) {
+      console.error('Error in deleteItem:', err);
+    }
   },
 
   async uploadThumbnail(itemId, thumbnailBlob) {
@@ -248,20 +358,34 @@ export const galleryService = {
       return null;
     }
 
-    const docRef = doc(db, COLLECTIONS.ITEMS, itemId);
-    const docSnap = await getDoc(docRef);
-    if (!docSnap.exists()) return null;
+    try {
+      const { data: item, error: getError } = await supabase
+        .from('items')
+        .select('*')
+        .eq('id', itemId)
+        .single();
 
-    const item = docSnap.data();
-    const timestamp = Date.now();
-    const thumbName = `thumb_${timestamp}.png`;
-    const userId = item.galleryId?.split('_')[0] || 'anonymous';
-    
-    const thumbRef = ref(storage, `thumbnails/${userId}/${item.galleryId}/${thumbName}`);
-    await uploadBytes(thumbRef, thumbnailBlob);
-    const thumbnailUrl = await getDownloadURL(thumbRef);
+      if (getError || !item) return null;
 
-    await updateDoc(docRef, { thumbnailUrl, updatedAt: new Date() });
-    return thumbnailUrl;
+      const timestamp = Date.now();
+      const thumbName = `thumb_${timestamp}.png`;
+      const userId = item.gallery_id?.split('_')[0] || 'anonymous';
+      const thumbPath = `thumbnails/${userId}/${item.gallery_id}/${thumbName}`;
+      
+      const { error: uploadError } = await supabase.storage
+        .from('glb-files')
+        .upload(thumbPath, thumbnailBlob);
+
+      if (uploadError) return null;
+
+      const { data: thumbUrlData } = supabase.storage.from('glb-files').getPublicUrl(thumbPath);
+      const thumbnailUrl = thumbUrlData?.publicUrl || `https://ngnjgjyxqiufiqgwdixf.supabase.co/storage/v1/object/public/glb-files/${thumbPath}`;
+
+      await this.updateItem(itemId, { thumbnail_url: thumbnailUrl });
+      return thumbnailUrl;
+    } catch (err) {
+      console.error('Error in uploadThumbnail:', err);
+      return null;
+    }
   }
 };
