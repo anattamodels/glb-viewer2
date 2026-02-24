@@ -30,6 +30,11 @@ jobs:
           node-version: '20'
           cache: 'pnpm'
       
+      - name: Create .env file
+        run: |
+          echo "VITE_SUPABASE_URL=https://ngnjgjyxqiufiqgwdixf.supabase.co" > .env
+          echo "VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5nbmpnanl4cWl1ZmlxZ3dkaXhmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE5MTA3NDcsImV4cCI6MjA4NzQ4Njc0N30.aJXWBjeKoAUnNyU9WwhZzf7-pZZEW8QvONAg4MOz77A" >> .env
+      
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
       
