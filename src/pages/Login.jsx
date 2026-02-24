@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import './Auth.css';
 
@@ -10,13 +10,29 @@ const Login = () => {
   const [displayName, setDisplayName] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
+  const [searchParams] = useSearchParams();
 
-  const { login, signup } = useAuth();
+  const { login, signup, user } = useAuth();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const errorParam = searchParams.get('error');
+    const type = searchParams.get('type');
+    
+    if (errorParam === 'confirmation') {
+      setError('Link de confirmação expirado ou inválido. Solicite um novo link de confirmação.');
+    }
+    
+    if (user) {
+      navigate('/dashboard');
+    }
+  }, [searchParams, user, navigate]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    setSuccessMessage('');
     setLoading(true);
 
     try {
@@ -24,32 +40,33 @@ const Login = () => {
         await login(email, password);
       } else {
         await signup(email, password, displayName);
+        setSuccessMessage('Conta criada! Verifique seu email para confirmar o cadastro.');
+        setIsLogin(true);
       }
-      navigate('/dashboard');
     } catch (err) {
-      setError(getErrorMessage(err.code));
+      const message = err.message || err.error_description || '';
+      if (message.includes('Email not confirmed')) {
+        setError('Email não confirmado. Verifique sua caixa de entrada e confirme seu email.');
+      } else if (message.includes('Invalid login')) {
+        setError('Email ou senha incorretos');
+      } else if (message.includes('User already registered')) {
+        setError('Este email já está cadastrado');
+      } else {
+        setError(getErrorMessage(message));
+      }
     } finally {
       setLoading(false);
     }
   };
 
-  const getErrorMessage = (code) => {
-    switch (code) {
-      case 'auth/email-already-in-use':
-        return 'Este email já está em uso';
-      case 'auth/invalid-email':
-        return 'Email inválido';
-      case 'auth/weak-password':
-        return 'Senha muito fraca (mínimo 6 caracteres)';
-      case 'auth/user-not-found':
-        return 'Usuário não encontrado';
-      case 'auth/wrong-password':
-        return 'Senha incorreta';
-      case 'auth/invalid-credential':
-        return 'Credenciais inválidas';
-      default:
-        return 'Erro ao processar requisição';
-    }
+  const getErrorMessage = (message) => {
+    if (message.includes('email-already-in-use')) return 'Este email já está em uso';
+    if (message.includes('invalid-email')) return 'Email inválido';
+    if (message.includes('weak-password')) return 'Senha muito fraca (mínimo 6 caracteres)';
+    if (message.includes('user-not-found')) return 'Usuário não encontrado';
+    if (message.includes('wrong-password')) return 'Senha incorreta';
+    if (message.includes('Invalid login')) return 'Email ou senha incorretos';
+    return 'Erro ao processar requisição';
   };
 
   return (
@@ -58,6 +75,12 @@ const Login = () => {
         <h1>{isLogin ? 'Login' : 'Criar Conta'}</h1>
         
         {error && <div className="auth-error">{error}</div>}
+        
+        {successMessage && (
+          <div className="auth-success">
+            {successMessage}
+          </div>
+        )}
         
         <form onSubmit={handleSubmit}>
           {!isLogin && (
@@ -105,7 +128,7 @@ const Login = () => {
           {isLogin ? 'Não tem conta? ' : 'Já tem conta? '}
           <button 
             type="button" 
-            onClick={() => setIsLogin(!isLogin)}
+            onClick={() => { setIsLogin(!isLogin); setError(''); setSuccessMessage(''); }}
             className="auth-link"
           >
             {isLogin ? 'Cadastre-se' : 'Entre'}

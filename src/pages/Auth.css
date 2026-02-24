@@ -73,6 +73,18 @@
   border: 1px solid rgba(255, 71, 87, 0.3);
 }
 
+.auth-success {
+  background: rgba(0, 255, 136, 0.15);
+  color: #00ff88;
+  padding: 16px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+  text-align: center;
+  font-size: 14px;
+  border: 1px solid rgba(0, 255, 136, 0.3);
+  line-height: 1.5;
+}
+
 .form-group {
   margin-bottom: 20px;
 }

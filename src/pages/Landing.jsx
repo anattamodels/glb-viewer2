@@ -1,4 +1,4 @@
-import { useRef, useState, useEffect, Suspense } from 'react';
+import { useRef, useState, Suspense } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls, Environment, Center, useGLTF } from '@react-three/drei';
@@ -24,7 +24,7 @@ const Landing = () => {
   const [editColor, setEditColor] = useState('#ffffff');
   const [wireframe, setWireframe] = useState(false);
   const containerRef = useRef(null);
-  const { user, isDemoMode } = useAuth();
+  const { user, isDemoMode, logout } = useAuth();
   const navigate = useNavigate();
 
   const handleFileChange = (event) => {
@@ -43,15 +43,25 @@ const Landing = () => {
     }
   };
 
+  const handleLogout = async () => {
+    await logout();
+    navigate('/');
+  };
+
   return (
     <div ref={containerRef} style={styles.container}>
       <header style={styles.header}>
         <h3 style={{ margin: 0 }}>🛠️ GLB Viewer</h3>
         <div style={styles.headerButtons}>
           {user ? (
-            <button style={styles.btnPrimary} onClick={() => navigate('/dashboard')}>
-              Minhas Galerias
-            </button>
+            <>
+              <button style={styles.btnSecondary} onClick={() => navigate('/dashboard')}>
+                Minhas Galerias
+              </button>
+              <button style={styles.btnLogout} onClick={handleLogout}>
+                Sair
+              </button>
+            </>
           ) : (
             <button style={styles.btnPrimary} onClick={() => navigate('/login')}>
               Entrar / Cadastrar
@@ -176,6 +186,28 @@ const styles = {
     textTransform: 'uppercase',
     letterSpacing: '1px',
     boxShadow: '0 0 15px rgba(157, 0, 255, 0.4)',
+  },
+  btnSecondary: {
+    padding: '8px 16px',
+    background: 'transparent',
+    color: '#00ff88',
+    border: '2px solid #00ff88',
+    borderRadius: '6px',
+    cursor: 'pointer',
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: '1px',
+  },
+  btnLogout: {
+    padding: '8px 16px',
+    background: 'transparent',
+    color: '#ff4757',
+    border: '2px solid #ff4757',
+    borderRadius: '6px',
+    cursor: 'pointer',
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: '1px',
   },
   demoBadge: {
     background: '#00ff88',
