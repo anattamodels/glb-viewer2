@@ -1,3 +1,5 @@
+import { useAuth } from '../context/AuthContext';
+import { db, storage } from '../firebase/config';
 import { 
   collection, 
   doc, 
@@ -11,15 +13,58 @@ import {
   orderBy 
 } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
-import { db, storage } from '../firebase/config';
 
 const COLLECTIONS = {
   GALLERIES: 'galleries',
   ITEMS: 'items'
 };
 
+let demoGalleries = [];
+let demoItems = [];
+
+const loadDemoData = () => {
+  if (typeof window !== 'undefined') {
+    const g = localStorage.getItem('demo_galleries');
+    const i = localStorage.getItem('demo_items');
+    demoGalleries = g ? JSON.parse(g) : [];
+    demoItems = i ? JSON.parse(i) : [];
+  }
+};
+
+const saveDemoGalleries = () => {
+  if (typeof window !== 'undefined') {
+    localStorage.setItem('demo_galleries', JSON.stringify(demoGalleries));
+  }
+};
+
+const saveDemoItems = () => {
+  if (typeof window !== 'undefined') {
+    localStorage.setItem('demo_items', JSON.stringify(demoItems));
+  }
+};
+
 export const galleryService = {
+  isDemoMode() {
+    return !import.meta.env.VITE_FIREBASE_API_KEY || 
+           import.meta.env.VITE_FIREBASE_API_KEY === 'your_api_key';
+  },
+
   async createGallery(userId, name, description = '') {
+    if (this.isDemoMode()) {
+      loadDemoData();
+      const gallery = {
+        id: 'demo_' + Date.now(),
+        userId,
+        name,
+        description,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      };
+      demoGalleries.unshift(gallery);
+      saveDemoGalleries();
+      return gallery;
+    }
+
     const gallery = {
       userId,
       name,
@@ -32,6 +77,11 @@ export const galleryService = {
   },
 
   async getGalleries(userId) {
+    if (this.isDemoMode()) {
+      loadDemoData();
+      return demoGalleries.filter(g => g.userId === userId);
+    }
+
     const q = query(
       collection(db, COLLECTIONS.GALLERIES),
       where('userId', '==', userId),
@@ -42,6 +92,11 @@ export const galleryService = {
   },
 
   async getGallery(galleryId) {
+    if (this.isDemoMode()) {
+      loadDemoData();
+      return demoGalleries.find(g => g.id === galleryId) || null;
+    }
+
     const docRef = doc(db, COLLECTIONS.GALLERIES, galleryId);
     const docSnap = await getDoc(docRef);
     if (docSnap.exists()) {
@@ -51,11 +106,30 @@ export const galleryService = {
   },
 
   async updateGallery(galleryId, data) {
+    if (this.isDemoMode()) {
+      loadDemoData();
+      const index = demoGalleries.findIndex(g => g.id === galleryId);
+      if (index !== -1) {
+        demoGalleries[index] = { ...demoGalleries[index], ...data, updatedAt: new Date() };
+        saveDemoGalleries();
+      }
+      return;
+    }
+
     const docRef = doc(db, COLLECTIONS.GALLERIES, galleryId);
     await updateDoc(docRef, { ...data, updatedAt: new Date() });
   },
 
   async deleteGallery(galleryId) {
+    if (this.isDemoMode()) {
+      loadDemoData();
+      demoItems = demoItems.filter(i => i.galleryId !== galleryId);
+      demoGalleries = demoGalleries.filter(g => g.id !== galleryId);
+      saveDemoGalleries();
+      saveDemoItems();
+      return;
+    }
+
     const items = await this.getItems(galleryId);
     for (const item of items) {
       if (item.thumbnailUrl) {
@@ -77,7 +151,26 @@ export const galleryService = {
   },
 
   async createItem(galleryId, file, thumbnailBlob) {
-    const userId = file.uid || 'anonymous';
+    if (this.isDemoMode()) {
+      loadDemoData();
+      const timestamp = Date.now();
+      const item = {
+        id: 'demo_item_' + timestamp,
+        galleryId,
+        name: file.name.replace('.glb', ''),
+        fileName: file.name,
+        glbUrl: URL.createObjectURL(file),
+        thumbnailUrl: null,
+        fileSize: file.size,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      };
+      demoItems.unshift(item);
+      saveDemoItems();
+      return item;
+    }
+
+    const userId = 'anonymous';
     const timestamp = Date.now();
     const fileName = `${timestamp}_${file.name}`;
     
@@ -109,6 +202,11 @@ export const galleryService = {
   },
 
   async getItems(galleryId) {
+    if (this.isDemoMode()) {
+      loadDemoData();
+      return demoItems.filter(i => i.galleryId === galleryId);
+    }
+
     const q = query(
       collection(db, COLLECTIONS.ITEMS),
       where('galleryId', '==', galleryId),
@@ -119,16 +217,37 @@ export const galleryService = {
   },
 
   async updateItem(itemId, data) {
+    if (this.isDemoMode()) {
+      loadDemoData();
+      const index = demoItems.findIndex(i => i.id === itemId);
+      if (index !== -1) {
+        demoItems[index] = { ...demoItems[index], ...data, updatedAt: new Date() };
+        saveDemoItems();
+      }
+      return;
+    }
+
     const docRef = doc(db, COLLECTIONS.ITEMS, itemId);
     await updateDoc(docRef, { ...data, updatedAt: new Date() });
   },
 
   async deleteItem(itemId) {
+    if (this.isDemoMode()) {
+      loadDemoData();
+      demoItems = demoItems.filter(i => i.id !== itemId);
+      saveDemoItems();
+      return;
+    }
+
     const docRef = doc(db, COLLECTIONS.ITEMS, itemId);
     await deleteDoc(docRef);
   },
 
   async uploadThumbnail(itemId, thumbnailBlob) {
+    if (this.isDemoMode()) {
+      return null;
+    }
+
     const docRef = doc(db, COLLECTIONS.ITEMS, itemId);
     const docSnap = await getDoc(docRef);
     if (!docSnap.exists()) return null;

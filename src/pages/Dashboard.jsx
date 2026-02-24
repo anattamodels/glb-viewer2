@@ -11,7 +11,7 @@ const Dashboard = () => {
   const [newGallery, setNewGallery] = useState({ name: '', description: '' });
   const [submitting, setSubmitting] = useState(false);
 
-  const { user, logout } = useAuth();
+  const { user, logout, isDemoMode } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -71,7 +71,8 @@ const Dashboard = () => {
 
   const formatDate = (date) => {
     if (!date) return '';
-    return new Date(date.seconds * 1000).toLocaleDateString('pt-BR');
+    if (date.seconds) return new Date(date.seconds * 1000).toLocaleDateString('pt-BR');
+    return new Date(date).toLocaleDateString('pt-BR');
   };
 
   if (loading) {
@@ -88,6 +89,7 @@ const Dashboard = () => {
       <header className="dashboard-header">
         <div className="header-left">
           <h1>Minhas Galerias</h1>
+          {isDemoMode && <span className="demo-badge">DEMO</span>}
           <span className="user-email">{user?.email}</span>
         </div>
         <div className="header-right">
