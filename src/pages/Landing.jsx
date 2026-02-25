@@ -48,6 +48,18 @@ const Landing = () => {
     navigate('/');
   };
 
+  const captureScreenshot = () => {
+    const canvas = document.querySelector('canvas');
+    if (canvas) {
+      const link = document.createElement('a');
+      link.download = `screenshot-${Date.now()}.png`;
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+    } else {
+      alert('Nenhum modelo carregado para capturar');
+    }
+  };
+
   return (
     <div ref={containerRef} style={styles.container}>
       <header style={styles.header}>
@@ -107,6 +119,12 @@ const Landing = () => {
             <div style={styles.section}>
               <button onClick={toggleFullscreen} style={styles.btnAction}>
                 ⛶ Tela Cheia
+              </button>
+            </div>
+
+            <div style={styles.section}>
+              <button onClick={captureScreenshot} style={styles.btnAction}>
+                📷 Capturar
               </button>
             </div>
           </>

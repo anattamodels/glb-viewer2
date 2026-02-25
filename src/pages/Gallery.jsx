@@ -18,7 +18,9 @@ const Gallery = () => {
   const [editingItem, setEditingItem] = useState(null);
   const [editName, setEditName] = useState('');
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [screenshotLoading, setScreenshotLoading] = useState(false);
   const fileInputRef = useRef(null);
+  const viewerContentRef = useRef(null);
 
   useEffect(() => {
     loadGallery();
@@ -109,6 +111,49 @@ const Gallery = () => {
       setEditName('');
     } catch (error) {
       console.error('Error renaming item:', error);
+    }
+  };
+
+  const captureScreenshot = () => {
+    setScreenshotLoading(true);
+    const viewerContent = document.getElementById('viewer-content');
+    const modelViewer = viewerContent?.querySelector('model-viewer');
+    
+    if (modelViewer) {
+      try {
+        modelViewer.dismissPoster();
+        setTimeout(() => {
+          const canvas = document.createElement('canvas');
+          const modelViewerRect = modelViewer.getBoundingClientRect();
+          canvas.width = modelViewerRect.width * 2;
+          canvas.height = modelViewerRect.height * 2;
+          
+          const ctx = canvas.getContext('2d');
+          if (modelViewer.shadowRoot) {
+            const canvasEl = modelViewer.shadowRoot.querySelector('canvas');
+            if (canvasEl) {
+              ctx.drawImage(canvasEl, 0, 0, canvas.width, canvas.height);
+              
+              const link = document.createElement('a');
+              link.download = `${selectedItem?.name || 'model'}-${Date.now()}.png`;
+              link.href = canvas.toDataURL('image/png');
+              link.click();
+            } else {
+              alert('Canvas não encontrado. Tente novamente.');
+            }
+          } else {
+            alert('Modelo ainda carregando. Aguarde e tente novamente.');
+          }
+          setScreenshotLoading(false);
+        }, 500);
+      } catch (err) {
+        console.error('Screenshot error:', err);
+        alert('Erro ao capturar screenshot');
+        setScreenshotLoading(false);
+      }
+    } else {
+      alert('Visualizador não encontrado');
+      setScreenshotLoading(false);
     }
   };
 
@@ -257,10 +302,13 @@ const Gallery = () => {
                 <button onClick={() => setIsFullscreen(!isFullscreen)} title={isFullscreen ? 'Sair da tela cheia' : 'Tela cheia'}>
                   {isFullscreen ? '⛶' : '⛶'}
                 </button>
+                <button onClick={() => captureScreenshot()} title="Capturar tela" disabled={screenshotLoading}>
+                  {screenshotLoading ? '⏳' : '📷'}
+                </button>
                 <button onClick={() => setSelectedItem(null)}>✕</button>
               </div>
             </div>
-            <div className="viewer-content">
+            <div className="viewer-content" id="viewer-content">
               <GLBViewer url={selectedItem.glb_url} isFullscreen={isFullscreen} />
             </div>
             <div className="viewer-info">

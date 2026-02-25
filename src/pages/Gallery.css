@@ -282,6 +282,11 @@
   box-shadow: 0 0 15px rgba(157, 0, 255, 0.5);
 }
 
+.viewer-actions button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .viewer-header h3 {
   color: var(--cyber-green);
   margin: 0;
