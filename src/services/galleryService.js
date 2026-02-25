@@ -167,14 +167,14 @@ export const galleryService = {
       for (const item of items || []) {
         if (item.glb_url) {
           try {
-            const path = item.glb_url.split('/storage/v1/object/public/glb-files/')[1];
-            if (path) await supabase.storage.from('glb-files').remove([path]);
+            const path = item.glb_url.split('/storage/v1/object/public/glb-file/')[1];
+            if (path) await supabase.storage.from('glb-file').remove([path]);
           } catch (e) {}
         }
         if (item.thumbnail_url) {
           try {
-            const path = item.thumbnail_url.split('/storage/v1/object/public/glb-files/')[1];
-            if (path) await supabase.storage.from('glb-files').remove([path]);
+            const path = item.thumbnail_url.split('/storage/v1/object/public/glb-file/')[1];
+            if (path) await supabase.storage.from('glb-file').remove([path]);
           } catch (e) {}
         }
         await this.deleteItem(item.id);
@@ -221,7 +221,7 @@ export const galleryService = {
       
       
       const { error: uploadError } = await supabase.storage
-        .from('glb-files')
+        .from('glb-file')
         .upload(filePath, file);
 
       if (uploadError) {
@@ -230,9 +230,9 @@ export const galleryService = {
       }
 
       const { data: urlData } = supabase.storage
-        .from('glb-files')
+        .from('glb-file')
         .getPublicUrl(filePath);
-      const glbUrl = urlData?.publicUrl || `https://ngnjgjyxqiufiqgwdixf.supabase.co/storage/v1/object/public/glb-files/${filePath}`;
+      const glbUrl = urlData?.publicUrl || `https://ngnjgjyxqiufiqgwdixf.supabase.co/storage/v1/object/public/glb-file/${filePath}`;
 
       
 
@@ -242,12 +242,12 @@ export const galleryService = {
         const thumbPath = `thumbnails/${userId}/${galleryId}/${thumbName}`;
         
         const { error: thumbError } = await supabase.storage
-          .from('glb-files')
+          .from('glb-file')
           .upload(thumbPath, thumbnailBlob);
 
         if (!thumbError) {
-          const { data: thumbUrlData } = supabase.storage.from('glb-files').getPublicUrl(thumbPath);
-          thumbnailUrl = thumbUrlData?.publicUrl || `https://ngnjgjyxqiufiqgwdixf.supabase.co/storage/v1/object/public/glb-files/${thumbPath}`;
+          const { data: thumbUrlData } = supabase.storage.from('glb-file').getPublicUrl(thumbPath);
+          thumbnailUrl = thumbUrlData?.publicUrl || `https://ngnjgjyxqiufiqgwdixf.supabase.co/storage/v1/object/public/glb-file/${thumbPath}`;
         }
       }
 
@@ -373,13 +373,13 @@ export const galleryService = {
       const thumbPath = `thumbnails/${userId}/${item.gallery_id}/${thumbName}`;
       
       const { error: uploadError } = await supabase.storage
-        .from('glb-files')
+        .from('glb-file')
         .upload(thumbPath, thumbnailBlob);
 
       if (uploadError) return null;
 
-      const { data: thumbUrlData } = supabase.storage.from('glb-files').getPublicUrl(thumbPath);
-      const thumbnailUrl = thumbUrlData?.publicUrl || `https://ngnjgjyxqiufiqgwdixf.supabase.co/storage/v1/object/public/glb-files/${thumbPath}`;
+      const { data: thumbUrlData } = supabase.storage.from('glb-file').getPublicUrl(thumbPath);
+      const thumbnailUrl = thumbUrlData?.publicUrl || `https://ngnjgjyxqiufiqgwdixf.supabase.co/storage/v1/object/public/glb-file/${thumbPath}`;
 
       await this.updateItem(itemId, { thumbnail_url: thumbnailUrl });
       return thumbnailUrl;
