@@ -39,17 +39,23 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    
-    
-    if (!isDemoMode) {
-      const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+    const initAuth = async () => {
+      if (!isDemoMode) {
+        const { data: { session } } = await supabase.auth.getSession()
+        if (session) {
+          setUser(session.user)
+        }
         
-        setUser(session?.user || null);
-        setLoading(false);
-      });
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+          setUser(session?.user || null);
+          setLoading(false);
+        });
 
-      return () => subscription.unsubscribe();
+        return () => subscription.unsubscribe();
+      }
     }
+    
+    initAuth();
   }, []);
 
   const signup = async (email, password, displayName) => {
